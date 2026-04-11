@@ -14,16 +14,249 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      food_donations: {
+        Row: {
+          created_at: string
+          donor_id: string
+          food_type: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          pickup_point: string
+          proof_image_url: string | null
+          quantity: string
+          status: string
+          updated_at: string
+          volunteer_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          donor_id: string
+          food_type: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          pickup_point: string
+          proof_image_url?: string | null
+          quantity: string
+          status?: string
+          updated_at?: string
+          volunteer_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          donor_id?: string
+          food_type?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          pickup_point?: string
+          proof_image_url?: string | null
+          quantity?: string
+          status?: string
+          updated_at?: string
+          volunteer_id?: string | null
+        }
+        Relationships: []
+      }
+      injury_reports: {
+        Row: {
+          ai_summary: string | null
+          assigned_volunteer_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          latitude: number | null
+          location: string | null
+          longitude: number | null
+          proof_image_url: string | null
+          reporter_id: string
+          severity: string | null
+          status: string
+          title: string
+          treatment_notes: string | null
+          treatment_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          assigned_volunteer_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          proof_image_url?: string | null
+          reporter_id: string
+          severity?: string | null
+          status?: string
+          title: string
+          treatment_notes?: string | null
+          treatment_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_summary?: string | null
+          assigned_volunteer_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          proof_image_url?: string | null
+          reporter_id?: string
+          severity?: string | null
+          status?: string
+          title?: string
+          treatment_notes?: string | null
+          treatment_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      money_donations: {
+        Row: {
+          amount: number
+          created_at: string
+          donor_id: string
+          id: string
+          note: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          donor_id: string
+          id?: string
+          note?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          donor_id?: string
+          id?: string
+          note?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          avatar_url: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string | null
+          full_name: string | null
+          gender: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "volunteer" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +383,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "volunteer", "admin"],
+    },
   },
 } as const
