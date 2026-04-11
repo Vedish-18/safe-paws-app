@@ -26,7 +26,7 @@ const Operations = () => {
 
   const filtered = ops.filter((o) => o.title.toLowerCase().includes(search.toLowerCase()));
 
-  const updateReport = async (id: string, updates: Record<string, any>) => {
+  const updateReport = async (id: string, updates: Partial<{ treatment_type: string; treatment_notes: string; severity: string; proof_image_url: string; status: string }>) => {
     const { error } = await supabase.from("injury_reports").update(updates).eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Updated!");
