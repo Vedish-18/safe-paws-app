@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Heart, Utensils, IndianRupee, Users } from "lucide-react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line } from "recharts";
 
 const COLORS = ["hsl(0,80%,65%)", "hsl(170,60%,45%)", "hsl(215,70%,30%)", "hsl(40,80%,55%)"];
 
@@ -9,6 +9,7 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState({ rescues: 0, foodDonations: 0, moneyRaised: 0, users: 0 });
   const [roleCounts, setRoleCounts] = useState<{ name: string; value: number }[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [overviewData, setOverviewData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -22,12 +23,19 @@ const AdminDashboard = () => {
         supabase.from("food_donations").select("created_at"),
       ]);
 
-      setStats({
-        rescues: r.count ?? 0,
-        foodDonations: f.count ?? 0,
-        moneyRaised: m.data?.reduce((s, d) => s + Number(d.amount), 0) ?? 0,
-        users: u.count ?? 0,
-      });
+      const rescues = r.count ?? 0;
+      const foodDonations = f.count ?? 0;
+      const moneyRaised = m.data?.reduce((s, d) => s + Number(d.amount), 0) ?? 0;
+      const usersCount = u.count ?? 0;
+
+      setStats({ rescues, foodDonations, moneyRaised, users: usersCount });
+
+      // Overview bar chart data
+      setOverviewData([
+        { name: "Animals Rescued", value: rescues },
+        { name: "Food Donations", value: foodDonations },
+        { name: "Money Raised (₹)", value: moneyRaised },
+      ]);
 
       // Role distribution
       const rc: Record<string, number> = {};
@@ -79,6 +87,24 @@ const AdminDashboard = () => {
             <p className="text-sm text-muted-foreground">{c.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Overview Graph - Total counts */}
+      <div className="bg-card rounded-3xl p-6 shadow-sm">
+        <h3 className="text-lg font-display text-foreground mb-4">Total Overview</h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={overviewData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", color: "hsl(var(--foreground))" }} />
+            <Bar dataKey="value" name="Count" radius={[6, 6, 0, 0]}>
+              {overviewData.map((_, i) => (
+                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
