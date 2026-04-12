@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -11,32 +12,48 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user, role, loading: authLoading } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user && role) {
+      navigate(`/${role}`, { replace: true });
+    }
+  }, [authLoading, user, role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No user");
-
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const role = roleData?.role || "user";
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("Invalid email or password. Please try again.");
+        } else if (error.message.includes("Email not confirmed")) {
+          toast.error("Please verify your email address before logging in.");
+        } else {
+          toast.error(error.message);
+        }
+        setLoading(false);
+        return;
+      }
+      // Auth state change listener in useAuth will update user/role,
+      // then the useEffect above will handle redirect
       toast.success("Login successful!");
-      navigate(`/${role}`, { replace: true });
     } catch (err: any) {
-      toast.error(err.message || "Login failed");
-    } finally {
+      toast.error(err.message || "An unexpected error occurred");
       setLoading(false);
     }
   };
+
+  // Show loading if auth is still initializing
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
