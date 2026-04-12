@@ -1,26 +1,60 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Heart, Utensils, IndianRupee, Users } from "lucide-react";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+
+const COLORS = ["hsl(0,80%,65%)", "hsl(170,60%,45%)", "hsl(215,70%,30%)", "hsl(40,80%,55%)"];
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({ rescues: 0, foodDonations: 0, moneyRaised: 0, users: 0 });
+  const [roleCounts, setRoleCounts] = useState<{ name: string; value: number }[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetch = async () => {
-      const [r, f, m, u] = await Promise.all([
+    const fetchAll = async () => {
+      const [r, f, m, u, roles, injuries, foods] = await Promise.all([
         supabase.from("injury_reports").select("*", { count: "exact", head: true }),
         supabase.from("food_donations").select("*", { count: "exact", head: true }),
         supabase.from("money_donations").select("amount"),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("user_roles").select("role"),
+        supabase.from("injury_reports").select("created_at"),
+        supabase.from("food_donations").select("created_at"),
       ]);
+
       setStats({
         rescues: r.count ?? 0,
         foodDonations: f.count ?? 0,
         moneyRaised: m.data?.reduce((s, d) => s + Number(d.amount), 0) ?? 0,
         users: u.count ?? 0,
       });
+
+      // Role distribution
+      const rc: Record<string, number> = {};
+      roles.data?.forEach((r) => { rc[r.role] = (rc[r.role] || 0) + 1; });
+      setRoleCounts(Object.entries(rc).map(([name, value]) => ({ name, value })));
+
+      // Monthly activity (last 6 months)
+      const months: Record<string, { injuries: number; food: number }> = {};
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
+        months[key] = { injuries: 0, food: 0 };
+      }
+      injuries.data?.forEach((item) => {
+        const d = new Date(item.created_at);
+        const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
+        if (months[key]) months[key].injuries++;
+      });
+      foods.data?.forEach((item) => {
+        const d = new Date(item.created_at);
+        const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
+        if (months[key]) months[key].food++;
+      });
+      setMonthlyData(Object.entries(months).map(([month, v]) => ({ month, ...v })));
     };
-    fetch();
+    fetchAll();
   }, []);
 
   const cards = [
@@ -45,6 +79,39 @@ const AdminDashboard = () => {
             <p className="text-sm text-muted-foreground">{c.label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Activity Bar Chart */}
+        <div className="bg-card rounded-3xl p-6 shadow-sm">
+          <h3 className="text-lg font-display text-foreground mb-4">Monthly Activity</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", color: "hsl(var(--foreground))" }} />
+              <Legend />
+              <Bar dataKey="injuries" name="Injury Reports" fill="hsl(0,80%,65%)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="food" name="Food Donations" fill="hsl(170,60%,45%)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Role Distribution Pie Chart */}
+        <div className="bg-card rounded-3xl p-6 shadow-sm">
+          <h3 className="text-lg font-display text-foreground mb-4">User Roles Distribution</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={roleCounts} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {roleCounts.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", color: "hsl(var(--foreground))" }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
