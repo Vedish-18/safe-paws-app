@@ -247,6 +247,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_public_impact_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          food_donations: number
+          money_donations: number
+          rescues: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

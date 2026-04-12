@@ -1,11 +1,32 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Heart, Utensils, IndianRupee, ChevronDown } from "lucide-react";
+import { Heart, Utensils, HandCoins, ChevronDown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import heroImg from "@/assets/hero-dogs.jpg";
 import ImpactCounter from "@/components/ImpactCounter";
 
 const Landing = () => {
   const impactRef = useRef<HTMLDivElement>(null);
+  const [impactStats, setImpactStats] = useState({
+    rescues: 0,
+    foodDonations: 0,
+    moneyDonations: 0,
+  });
+
+  useEffect(() => {
+    const fetchImpactStats = async () => {
+      const { data } = await supabase.rpc("get_public_impact_stats");
+      const stats = data?.[0];
+
+      setImpactStats({
+        rescues: stats?.rescues ?? 0,
+        foodDonations: stats?.food_donations ?? 0,
+        moneyDonations: stats?.money_donations ?? 0,
+      });
+    };
+
+    fetchImpactStats();
+  }, []);
 
   const scrollToImpact = () => {
     impactRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -13,7 +34,6 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
       <section className="relative h-screen flex flex-col">
         <img
           src={heroImg}
@@ -24,7 +44,6 @@ const Landing = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20" />
         
-        {/* Nav */}
         <nav className="relative z-10 flex items-center justify-between p-6 md:px-12">
           <h1 className="text-2xl font-display text-primary-foreground italic">Safe-Paws</h1>
           <div className="flex gap-3">
@@ -40,7 +59,6 @@ const Landing = () => {
           </div>
         </nav>
 
-        {/* Hero Content */}
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6">
           <h2 className="text-4xl md:text-6xl lg:text-7xl font-display text-primary-foreground max-w-4xl leading-tight">
             Protect Street Dogs With Safe-Paws
@@ -55,13 +73,11 @@ const Landing = () => {
           </Link>
         </div>
 
-        {/* Scroll indicator */}
         <button onClick={scrollToImpact} className="relative z-10 mx-auto mb-8 animate-bounce">
           <ChevronDown className="h-8 w-8 text-primary-foreground/70" />
         </button>
       </section>
 
-      {/* Impact Section */}
       <section ref={impactRef} className="py-20 px-6 bg-secondary">
         <div className="max-w-5xl mx-auto text-center">
           <h3 className="text-3xl md:text-4xl font-display text-foreground mb-4">Our Impact</h3>
@@ -69,9 +85,9 @@ const Landing = () => {
             Real-time numbers from our community of rescuers and donors.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <ImpactCounter icon={<Heart className="h-10 w-10 text-coral" />} label="Animals Rescued" table="injury_reports" />
-            <ImpactCounter icon={<Utensils className="h-10 w-10 text-accent" />} label="Food Donations" table="food_donations" />
-            <ImpactCounter icon={<IndianRupee className="h-10 w-10 text-primary" />} label="Money Raised" table="money_donations" isSum />
+            <ImpactCounter icon={<Heart className="h-10 w-10 text-coral" />} label="Animals Rescued" value={impactStats.rescues} />
+            <ImpactCounter icon={<Utensils className="h-10 w-10 text-accent" />} label="Food Donations" value={impactStats.foodDonations} />
+            <ImpactCounter icon={<HandCoins className="h-10 w-10 text-primary" />} label="Money Donations" value={impactStats.moneyDonations} />
           </div>
         </div>
       </section>

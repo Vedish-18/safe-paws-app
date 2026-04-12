@@ -1,28 +1,88 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Clipboard, Utensils, Activity, AlertTriangle, MapPin, Upload, X } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Clipboard, Utensils, Activity, AlertTriangle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+
+const COLORS = ["hsl(215,70%,30%)", "hsl(170,60%,45%)", "hsl(0,80%,65%)", "hsl(40,80%,55%)"];
 
 const VolunteerDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ operations: 0, foodPickups: 0, pendingCases: 0 });
+  const [monthlyData, setMonthlyData] = useState<{ month: string; operations: number; completed: number; food: number }[]>([]);
+  const [actionSplit, setActionSplit] = useState<{ name: string; value: number }[]>([]);
+
+  const fetchStats = async () => {
+    if (!user) return;
+
+    const [ops, food, pending, operationRows, foodRows] = await Promise.all([
+      supabase.from("injury_reports").select("*", { count: "exact", head: true }).eq("assigned_volunteer_id", user.id),
+      supabase.from("food_donations").select("*", { count: "exact", head: true }).eq("volunteer_id", user.id),
+      supabase.from("injury_reports").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("injury_reports").select("created_at, status").eq("assigned_volunteer_id", user.id),
+      supabase.from("food_donations").select("created_at, status").eq("volunteer_id", user.id),
+    ]);
+
+    const operations = ops.count ?? 0;
+    const foodPickups = food.count ?? 0;
+    const pendingCases = pending.count ?? 0;
+    const completedOperations = operationRows.data?.filter((item) => item.status === "completed").length ?? 0;
+
+    setStats({ operations, foodPickups, pendingCases });
+    setActionSplit([
+      { name: "Assigned Operations", value: operations },
+      { name: "Completed Rescues", value: completedOperations },
+      { name: "Food Pickups", value: foodPickups },
+    ]);
+
+    const months: Record<string, { operations: number; completed: number; food: number }> = {};
+    const now = new Date();
+    for (let index = 5; index >= 0; index--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const key = date.toLocaleString("default", { month: "short", year: "2-digit" });
+      months[key] = { operations: 0, completed: 0, food: 0 };
+    }
+
+    operationRows.data?.forEach((item) => {
+      const key = new Date(item.created_at).toLocaleString("default", { month: "short", year: "2-digit" });
+      if (!months[key]) return;
+      months[key].operations++;
+      if (item.status === "completed") {
+        months[key].completed++;
+      }
+    });
+
+    foodRows.data?.forEach((item) => {
+      const key = new Date(item.created_at).toLocaleString("default", { month: "short", year: "2-digit" });
+      if (months[key]) months[key].food++;
+    });
+
+    setMonthlyData(Object.entries(months).map(([month, value]) => ({ month, ...value })));
+  };
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const [ops, food, pending] = await Promise.all([
-        supabase.from("injury_reports").select("*", { count: "exact", head: true }).eq("assigned_volunteer_id", user.id),
-        supabase.from("food_donations").select("*", { count: "exact", head: true }).eq("volunteer_id", user.id),
-        supabase.from("injury_reports").select("*", { count: "exact", head: true }).eq("status", "pending"),
-      ]);
-      setStats({ operations: ops.count ?? 0, foodPickups: food.count ?? 0, pendingCases: pending.count ?? 0 });
+
+    fetchStats();
+
+    const injuryChannel = supabase
+      .channel(`volunteer-dashboard-injury-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "injury_reports" }, fetchStats)
+      .subscribe();
+
+    const foodChannel = supabase
+      .channel(`volunteer-dashboard-food-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "food_donations" }, fetchStats)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(injuryChannel);
+      supabase.removeChannel(foodChannel);
     };
-    fetch();
   }, [user]);
 
   const cards = [
@@ -42,7 +102,7 @@ const VolunteerDashboard = () => {
         <div className="bg-card rounded-3xl p-6 shadow-sm">
           <Clipboard className="h-6 w-6 text-primary mb-2" />
           <p className="text-2xl font-bold text-foreground">{stats.operations}</p>
-          <p className="text-sm text-muted-foreground">Operations Done</p>
+          <p className="text-sm text-muted-foreground">Assigned Operations</p>
         </div>
         <div className="bg-card rounded-3xl p-6 shadow-sm">
           <Utensils className="h-6 w-6 text-accent mb-2" />
@@ -57,133 +117,131 @@ const VolunteerDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {cards.map((c) => (
-          <Link key={c.path} to={c.path} className="bg-card rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow text-center group">
-            <div className={`${c.color} flex justify-center mb-3 group-hover:scale-110 transition-transform`}>{c.icon}</div>
-            <p className="text-sm font-medium text-foreground">{c.label}</p>
+        {cards.map((card) => (
+          <Link key={card.path} to={card.path} className="bg-card rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow text-center group">
+            <div className={`${card.color} flex justify-center mb-3 group-hover:scale-110 transition-transform`}>{card.icon}</div>
+            <p className="text-sm font-medium text-foreground">{card.label}</p>
           </Link>
         ))}
       </div>
 
-      <AvailableInjuries />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-card rounded-3xl p-6 shadow-sm">
+          <h3 className="text-lg font-display text-foreground mb-4">Your Monthly Work</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", color: "hsl(var(--foreground))" }} />
+              <Legend />
+              <Bar dataKey="operations" name="Assigned Operations" fill={COLORS[0]} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="completed" name="Completed Rescues" fill={COLORS[1]} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="food" name="Food Pickups" fill={COLORS[2]} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="bg-card rounded-3xl p-6 shadow-sm">
+          <h3 className="text-lg font-display text-foreground mb-4">Action Breakdown</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie data={actionSplit.filter((item) => item.value > 0)} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {actionSplit.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", color: "hsl(var(--foreground))" }} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <AvailableInjuries onStatsChange={fetchStats} onAccepted={() => navigate("/volunteer/operations")} />
     </div>
   );
 };
 
-const AvailableInjuries = () => {
+const AvailableInjuries = ({
+  onStatsChange,
+  onAccepted,
+}: {
+  onStatsChange: () => Promise<void>;
+  onAccepted: () => void;
+}) => {
   const { user } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
-  const [rescueMode, setRescueMode] = useState<any | null>(null);
+
+  const fetchReports = async () => {
+    const { data } = await supabase
+      .from("injury_reports")
+      .select("*")
+      .eq("status", "pending")
+      .is("assigned_volunteer_id", null)
+      .order("created_at", { ascending: false });
+
+    setReports(data ?? []);
+  };
 
   useEffect(() => {
-    supabase.from("injury_reports").select("*").eq("status", "pending").order("created_at", { ascending: false })
-      .then(({ data }) => setReports(data ?? []));
+    fetchReports();
+
+    const channel = supabase
+      .channel("available-injury-cases")
+      .on("postgres_changes", { event: "*", schema: "public", table: "injury_reports" }, () => {
+        fetchReports();
+        onStatsChange();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const acceptCase = async (report: any) => {
     if (!user) return;
-    const { error } = await supabase.from("injury_reports").update({ assigned_volunteer_id: user.id, status: "accepted" }).eq("id", report.id);
-    if (!error) {
-      await supabase.from("activity_logs").insert({ user_id: user.id, action: "Accepted rescue case", entity_type: "injury_report", entity_id: report.id });
-      setReports((p) => p.filter((r) => r.id !== report.id));
-      setSelectedReport(null);
-      setRescueMode({ ...report, status: "accepted", assigned_volunteer_id: user.id });
-      toast.success("Case accepted! Complete the rescue operation.");
+
+    const { data, error } = await supabase
+      .from("injury_reports")
+      .update({ assigned_volunteer_id: user.id })
+      .eq("id", report.id)
+      .eq("status", "pending")
+      .is("assigned_volunteer_id", null)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      toast.error(error?.message || "This case is no longer available.");
+      fetchReports();
+      onStatsChange();
+      return;
     }
+
+    await supabase.from("activity_logs").insert({
+      user_id: user.id,
+      action: "Accepted rescue case",
+      entity_type: "injury_report",
+      entity_id: report.id,
+    });
+
+    setReports((current) => current.filter((item) => item.id !== report.id));
+    setSelectedReport(null);
+    await onStatsChange();
+    toast.success("Case assigned to you and moved to your operations page.");
+    onAccepted();
   };
 
-  const updateRescue = async (id: string, updates: Partial<{ treatment_type: string; treatment_notes: string; severity: string; proof_image_url: string; status: string }>) => {
-    const { error } = await supabase.from("injury_reports").update(updates).eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Updated!");
-    setRescueMode((prev: any) => prev ? { ...prev, ...updates } : null);
-  };
-
-  const uploadProof = async (id: string, file: File) => {
-    const path = `proofs/${user!.id}/${Date.now()}.${file.name.split(".").pop()}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, file);
-    if (error) { toast.error("Upload failed"); return; }
-    const { data } = supabase.storage.from("uploads").getPublicUrl(path);
-    await updateRescue(id, { proof_image_url: data.publicUrl });
-    toast.success("Proof uploaded!");
-  };
-
-  const submitRescue = async () => {
-    if (!rescueMode) return;
-    if (!rescueMode.treatment_type) { toast.error("Select a treatment type"); return; }
-    if (!rescueMode.proof_image_url) { toast.error("Upload proof of rescue"); return; }
-    const { error } = await supabase.from("injury_reports").update({ status: "completed" }).eq("id", rescueMode.id);
-    if (error) { toast.error(error.message); return; }
-    await supabase.from("activity_logs").insert({ user_id: user!.id, action: "Completed rescue", entity_type: "injury_report", entity_id: rescueMode.id, details: `Treatment: ${rescueMode.treatment_type}` });
-    toast.success("Rescue operation submitted!");
-    setRescueMode(null);
-  };
-
-  // Rescue operation mode
-  if (rescueMode) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-display text-foreground">Rescue Operation</h3>
-          <Button variant="outline" size="sm" className="rounded-2xl" onClick={() => setRescueMode(null)}>← Back</Button>
-        </div>
-        <div className="bg-card rounded-3xl p-8 shadow-sm space-y-5 max-w-3xl">
-          <h2 className="text-2xl font-display text-foreground">{rescueMode.title}</h2>
-          {rescueMode.image_url && <img src={rescueMode.image_url} alt="" className="w-full max-h-64 object-cover rounded-2xl" />}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><span className="text-muted-foreground">Location:</span><p className="text-foreground">{rescueMode.location}</p></div>
-            <div><span className="text-muted-foreground">Severity:</span><p className="text-foreground capitalize">{rescueMode.severity}</p></div>
-          </div>
-          {rescueMode.description && <p className="text-sm text-muted-foreground">{rescueMode.description}</p>}
-          {rescueMode.ai_summary && <div className="bg-accent/10 rounded-2xl p-4"><p className="text-sm text-accent font-semibold">AI Summary</p><p className="text-sm">{rescueMode.ai_summary}</p></div>}
-
-          {rescueMode.location && (
-            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rescueMode.location)}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-primary text-sm font-medium">
-              <MapPin className="h-4 w-4" /> Navigate to Location
-            </a>
-          )}
-
-          <div>
-            <p className="text-sm font-medium text-foreground mb-2">Treatment Type *</p>
-            <Select value={rescueMode.treatment_type || ""} onValueChange={(v) => updateRescue(rescueMode.id, { treatment_type: v, severity: v === "first_aid" ? "low" : "high" })}>
-              <SelectTrigger className="rounded-2xl bg-muted/50 border-0 h-12"><SelectValue placeholder="Select treatment" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="first_aid">Treat on Spot / First Aid</SelectItem>
-                <SelectItem value="veterinarian">Take to Veterinarian</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-foreground mb-2">Treatment Notes</p>
-            <Textarea className="rounded-2xl bg-muted/50 border-0" defaultValue={rescueMode.treatment_notes || ""} onBlur={(e) => updateRescue(rescueMode.id, { treatment_notes: e.target.value })} />
-          </div>
-
-          <div>
-            <p className="text-sm font-medium text-foreground mb-2">Upload Proof of Rescue *</p>
-            <label className="flex items-center gap-2 cursor-pointer text-accent text-sm font-medium">
-              <Upload className="h-4 w-4" /> Upload Image
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadProof(rescueMode.id, e.target.files[0]); }} />
-            </label>
-            {rescueMode.proof_image_url && <img src={rescueMode.proof_image_url} alt="Proof" className="mt-3 max-h-40 rounded-xl object-cover" />}
-          </div>
-
-          <Button onClick={submitRescue} className="w-full rounded-2xl h-12 bg-primary text-primary-foreground font-semibold">
-            Submit Rescue Operation
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Detail view popup
   if (selectedReport) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-display text-foreground">Injury Case Details</h3>
-          <Button variant="outline" size="sm" className="rounded-2xl" onClick={() => setSelectedReport(null)}>← Back</Button>
+          <Button variant="outline" size="sm" className="rounded-2xl" onClick={() => setSelectedReport(null)}>
+            Back
+          </Button>
         </div>
         <div className="bg-card rounded-3xl p-8 shadow-sm space-y-5 max-w-3xl">
           <h2 className="text-2xl font-display text-foreground">{selectedReport.title}</h2>
@@ -213,13 +271,13 @@ const AvailableInjuries = () => {
     <div>
       <h3 className="text-lg font-display text-foreground mb-4">Available Injury Cases</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {reports.map((r) => (
-          <button key={r.id} onClick={() => setSelectedReport(r)} className="bg-card rounded-2xl p-5 shadow-sm space-y-3 text-left hover:shadow-md transition-shadow">
-            {r.image_url && <img src={r.image_url} alt={r.title} className="w-full h-32 object-cover rounded-xl" />}
-            <p className="font-medium text-foreground">{r.title}</p>
-            <p className="text-xs text-muted-foreground">{r.location}</p>
-            {r.description && <p className="text-sm text-muted-foreground line-clamp-2">{r.description}</p>}
-            <span className="inline-block text-xs px-3 py-1 rounded-full font-medium bg-coral/20 text-coral">View Details →</span>
+        {reports.map((report) => (
+          <button key={report.id} onClick={() => setSelectedReport(report)} className="bg-card rounded-2xl p-5 shadow-sm space-y-3 text-left hover:shadow-md transition-shadow">
+            {report.image_url && <img src={report.image_url} alt={report.title} className="w-full h-32 object-cover rounded-xl" />}
+            <p className="font-medium text-foreground">{report.title}</p>
+            <p className="text-xs text-muted-foreground">{report.location}</p>
+            {report.description && <p className="text-sm text-muted-foreground line-clamp-2">{report.description}</p>}
+            <span className="inline-block text-xs px-3 py-1 rounded-full font-medium bg-coral/20 text-coral">View Details</span>
           </button>
         ))}
         {reports.length === 0 && <p className="text-sm text-muted-foreground">No pending cases.</p>}
