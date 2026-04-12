@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Utensils, IndianRupee, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import heroImg from "@/assets/hero-dogs.jpg";
 import ImpactCounter from "@/components/ImpactCounter";
 
@@ -29,19 +28,15 @@ const Landing = () => {
         <nav className="relative z-10 flex items-center justify-between p-6 md:px-12">
           <h1 className="text-2xl font-display text-primary-foreground italic">Safe-Paws</h1>
           <div className="flex gap-3">
-            <Link to="/login">
-              <Button variant="outline" className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10 rounded-2xl">
-                Login
-              </Button>
+            <Link to="/login" className="px-5 py-2 rounded-2xl text-primary-foreground/90 font-bold backdrop-blur-sm bg-white/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-white/10">
+              Login
             </Link>
-            <Link to="/register">
-              <Button variant="outline" className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10 rounded-2xl">
-                Register
-              </Button>
+            <Link to="/register" className="px-5 py-2 rounded-2xl text-primary-foreground/90 font-bold backdrop-blur-sm bg-white/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-white/10">
+              Register
             </Link>
-            <Button variant="outline" onClick={scrollToImpact} className="border-primary-foreground/50 text-primary-foreground hover:bg-primary-foreground/10 rounded-2xl">
+            <button onClick={scrollToImpact} className="px-5 py-2 rounded-2xl text-primary-foreground/90 font-bold backdrop-blur-sm bg-white/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-white/10">
               Statistics
-            </Button>
+            </button>
           </div>
         </nav>
 
@@ -54,9 +49,9 @@ const Landing = () => {
             Report injured dogs, support rescue teams, and save lives together.
           </p>
           <Link to="/login" className="mt-8">
-            <Button className="bg-coral text-coral-foreground hover:bg-coral/90 rounded-full px-10 py-6 text-lg font-semibold">
+            <button className="bg-coral text-coral-foreground hover:bg-coral/90 rounded-full px-10 py-4 text-lg font-semibold transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
               Login to Continue
-            </Button>
+            </button>
           </Link>
         </div>
 

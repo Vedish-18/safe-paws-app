@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { MapPin } from "lucide-react";
 
 const FoodDonation = () => {
   const { user } = useAuth();
@@ -16,6 +17,24 @@ const FoodDonation = () => {
   const fetchHistory = async () => {
     const { data } = await supabase.from("food_donations").select("*").eq("donor_id", user!.id).order("created_at", { ascending: false });
     setHistory(data ?? []);
+  };
+
+  const getLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+            const data = await res.json();
+            setForm((p) => ({ ...p, pickupPoint: data.display_name || `${latitude}, ${longitude}` }));
+          } catch {
+            setForm((p) => ({ ...p, pickupPoint: `${latitude}, ${longitude}` }));
+          }
+        },
+        () => toast.error("Could not get location")
+      );
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +66,12 @@ const FoodDonation = () => {
       <form onSubmit={handleSubmit} className="bg-card rounded-3xl p-8 shadow-sm space-y-5">
         <Input placeholder="Food Type (e.g., Rice, Chapati)" value={form.foodType} onChange={(e) => setForm((p) => ({ ...p, foodType: e.target.value }))} required className="rounded-2xl bg-muted/50 border-0 h-12" />
         <Input placeholder="Quantity" value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} required className="rounded-2xl bg-muted/50 border-0 h-12" />
-        <Input placeholder="Pickup Point" value={form.pickupPoint} onChange={(e) => setForm((p) => ({ ...p, pickupPoint: e.target.value }))} required className="rounded-2xl bg-muted/50 border-0 h-12" />
+        <div className="flex gap-2">
+          <Input placeholder="Pickup Point" value={form.pickupPoint} onChange={(e) => setForm((p) => ({ ...p, pickupPoint: e.target.value }))} required className="rounded-2xl bg-muted/50 border-0 h-12 flex-1" />
+          <Button type="button" variant="outline" onClick={getLocation} className="rounded-2xl h-12 px-4">
+            <MapPin className="h-5 w-5" />
+          </Button>
+        </div>
         <Button type="submit" disabled={loading} className="w-full rounded-2xl h-12 bg-primary text-primary-foreground font-semibold">
           {loading ? "Submitting..." : "Submit Donation"}
         </Button>
