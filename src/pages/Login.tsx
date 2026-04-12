@@ -30,7 +30,7 @@ const Login = () => {
 
       const role = roleData?.role || "user";
       toast.success("Login successful!");
-      window.location.href = `/${role}`;
+      navigate(`/${role}`, { replace: true });
     } catch (err: any) {
       toast.error(err.message || "Login failed");
     } finally {
