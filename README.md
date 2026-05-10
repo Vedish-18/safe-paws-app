@@ -1,3 +1,3 @@
 # Welcome to Safe-paws
 
-TODO: Document your project here
+Safe-Paws is a web application designed to rescue and help stray animals.
